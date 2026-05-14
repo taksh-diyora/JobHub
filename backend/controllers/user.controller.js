@@ -1,6 +1,8 @@
 import { User } from "../models/user.model.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
+import getDataUri from "../utils/datauri.js";
+import cloudinary from "../utils/cloudinary.js";
 
 export const register = async (req, res) => {
     try{
@@ -118,7 +120,13 @@ export const updateProfile = async (req, res) => {
         const {fullname, email, phoneNumber, bio, skills} = req.body;
         const file = req.file;
 
-        //cloudinary setup left
+        let cloudResponse = null;
+        if (file) {
+            const fileUri = getDataUri(file);
+            cloudResponse = await cloudinary.uploader.upload(fileUri.content, {
+                resource_type: "raw"
+            });
+        }
 
         const userId = req.id;
 
@@ -137,6 +145,11 @@ export const updateProfile = async (req, res) => {
         if(bio) user.profile.bio = bio;
         if(skills) user.profile.skills = skills.split(",");
 
+        if(cloudResponse){
+            user.profile.resume = cloudResponse.secure_url;
+            user.profile.resumeOriginalName = file.originalname;
+        }
+
         await user.save();
 
         user = {
@@ -149,11 +162,15 @@ export const updateProfile = async (req, res) => {
         }
 
         return res.status(200).json({
-            message:`Profile updated successfull.`,
+            message:`Profile updated successfully.`,
             user,
             success:true
         })
     }catch(error){
         console.log(error);
+        return res.status(500).json({
+            message: "Internal server error.",
+            success: false
+        });
     }
 }
